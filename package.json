@@ -1,0 +1,23 @@
+{
+  "name": "social-network-microservices",
+  "version": "1.0.0",
+  "description": "Social Network Microservices Backend",
+  "scripts": {
+    "start:posts": "node services/posts-service/app.js",
+    "start:graphql": "node services/graphql-service/server.js",
+    "start:chat": "node services/chat-service/server.js",
+    "start:notifications": "node services/kafka-consumers/notifications.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.8.0",
+    "@grpc/proto-loader": "^0.7.0",
+    "apollo-server": "^3.12.0",
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "graphql": "^16.6.0",
+    "kafkajs": "^2.2.0",
+    "mongoose": "^7.0.0"
+  }
+}
