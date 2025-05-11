@@ -42,6 +42,7 @@ Le système est composé de plusieurs services qui communiquent entre eux via di
 - Service Stories: Traitement des événements liés aux stories
 - Service Notifications: Traitement des notifications utilisateur
 - Service Chat: Communication en temps réel via gRPC
+
 Ces services communiquent entre eux principalement via Kafka pour les communications asynchrones événementielles, et utilisent MongoDB comme base de données commune.
 
 ```mermaid
