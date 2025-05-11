@@ -277,28 +277,31 @@ NODE_ENV=development
    ```
 
 4. **Démarrage des Services**
-   
-   a. **En Mode Développement**
-   ```bash
-   # Démarrer le service de posts (http://localhost:3000)
-   node app.js (dans le répertoire du service Posts)
-  
-   # Démarrer le service GraphQL 
-   node server.js (dans le répertoire du service Graphql)
-   # Interface GraphQL Playground disponible sur http://localhost:4000/graphql
 
-   # Démarrer le service de chat gRPC (localhost:50051)
+   a. Démarrer le service de posts (http://localhost:3000)
+   ```bash
+   node app.js (dans le répertoire du service Posts)
+   ```
+   b. Démarrer le service GraphQL (http://localhost:4000/graphql)
+   ```bash
+   node server.js (dans le répertoire du service Graphql)
+   ```
+   
+   c. Démarrer le service de chat gRPC (http://localhost:50051)
+   ```bash
    node server.js  (dans le répertoire du service Chat)
    # Service de chat en temps réel via gRPC
-
-   # Démarrer le consumer de notifications  (dans le répertoire du service kafka-consumers)
+   ```
+   
+   d. Démarrer le consumer de notifications  (dans le répertoire du service kafka-consumers)
+   ```bash
    node notifications.js
    # Traite les événements de notifications en arrière-plan
    node stories.js 
    # Traite les événements de notifications en arrière-plan
    ```
 
-5. **Services (par ordre)** 
+6. **Services (par ordre)** 
    - Démarrer le service Posts
    - Lancer le service GraphQL
    - Activer les consumers
