@@ -2,9 +2,47 @@
 
 ## Vue d'Ensemble
 
-Application de réseau social construite avec une architecture microservices, permettant le partage de posts, stories et interactions entre utilisateurs.
+Cette plateforme de réseau social est construite sur une architecture de microservices, utilisant Node.js et divers protocoles de communication pour créer une application scalable et robuste. La plateforme permet aux utilisateurs de partager des posts, des stories éphémères (24h), de discuter en temps réel et de recevoir des notifications d'activités.
+
+### Technologies utilisées
+-  Node.js: Plateforme d'exécution
+-  Express.js: Framework web pour les API REST
+-  MongoDB & Mongoose: Base de données et ODM
+-  Kafka: Bus de messages pour la communication entre services
+-  Apollo Server: Serveur GraphQL
+-  gRPC: Framework RPC pour la communication en temps réel du chat
+-  Protocol Buffers: Format d'échange pour gRPC
+
+## Structure du Projet
+
+```
+projet-micro/
+├── services/
+│   ├── posts-service/       # Service REST pour les posts
+│   │   └── app.js
+│   ├── graphql-service/     # Service GraphQL
+│   │   └── server.js
+│   ├── chat-service/        # Service gRPC pour le chat
+│   │   ├── server.js
+│   │   └── chat.proto
+│   └── kafka-consumers/     # Consumers Kafka
+│       ├── stories.js
+│       └── notifications.js
+├── package-lock.json
+├── package.json
+└── .env
+```
+
 
 ## Architecture Technique
+Le système est composé de plusieurs services qui communiquent entre eux via différents protocoles:
+- API Gateway: Point d'entrée principal pour les clients 
+- Service GraphQL: Interface unifiée pour les requêtes de données
+- Service Posts: Gestion des publications et des stories
+- Service Stories: Traitement des événements liés aux stories
+- Service Notifications: Traitement des notifications utilisateur
+- Service Chat: Communication en temps réel via gRPC
+Ces services communiquent entre eux principalement via Kafka pour les communications asynchrones événementielles, et utilisent MongoDB comme base de données commune.
 
 ```mermaid
 graph TB
@@ -48,6 +86,7 @@ graph TB
     Kafka --> |"Consumes Events"| Stories;
     
     Posts --> |"CRUD Operations"| MongoDB;
+    Chat --> |"Store Messages"| MongoDB;
     Notifications --> |"Stores Notifications"| MongoDB;
     Stories --> |"Manages Stories"| MongoDB;
 
@@ -62,49 +101,28 @@ graph TB
 
 ### 1. Posts Service (Port 3000)
 
-#### Fonctionnalités
-- Création et gestion des posts
-- Gestion des likes et commentaires
-- Publication de stories éphémères
+Ce service gère les posts et les stories via une API REST. Il permet de:
+- Créer, lire, commenter et liker des posts
+- Créer et lire des stories éphémères (24h)
+Le service publie des événements sur Kafka pour informer les autres services des activités pertinentes.
 
-#### Modèles de Données
+#### Points d'API principaux:
 
-##### Posts
-- Contenu textuel
-- Identifiant de l'auteur
-- Compteur de likes
-- Liste des commentaires
-- Horodatage
+- POST /posts: Créer un nouveau post
+- GET /posts: Récupérer tous les posts
+- POST /posts/:id/like: Aimer un post
+- POST /posts/:id/comments: Commenter un post
+- GET /posts/:id/comments: Récupérer les commentaires d'un post
+- POST /stories: Créer une nouvelle story
+- GET /stories: Récupérer toutes les stories actives
+- GET /stories/user/:userId: Récupérer les stories d'un utilisateur spécifique
 
-##### Stories
-- Contenu
-- Auteur
-- Date de création
-- Date d'expiration (24h)
-
-#### API REST
-
-| Endpoint | Méthode | Description | Paramètres |
-|----------|---------|-------------|------------|
-| /posts | POST | Créer un post | content, userId |
-| /posts | GET | Liste des posts | page, limit |
-| /posts/:id/like | POST | Liker un post | userId |
-| /posts/:id/comment | POST | Commenter | userId, text |
-| /stories | POST | Créer une story | content, userId |
-| /stories | GET | Stories actives | - |
-
-#### Événements Émis
-- POST_CREATED
-- POST_LIKED
-- COMMENT_ADDED
-- STORY_CREATED
 
 ### 2. GraphQL Service (Port 4000)
-
-#### Fonctionnalités
-- Agrégation des données
-- Feed personnalisé
-- Requêtes optimisées
+Ce service fournit une API GraphQL qui sert de façade pour les autres services. Il offre:
+- Un point d'entrée unifié pour les requêtes clients
+- Des resolvers qui communiquent avec le service Posts via HTTP
+- Une interface structurée pour récupérer les posts et leurs données associées
 
 #### Types GraphQL
 
@@ -125,12 +143,18 @@ graph TB
 - feed(userId: ID!): [Post!]!
 - post(id: ID!): Post
 
-### 3. Notification Consumer
+### 3. Chat Service 
+Ce service implémente une API gRPC pour la messagerie en temps réel. Il permet:
+- L'envoi de messages privés entre utilisateurs
+- La souscription en streaming pour recevoir des messages en temps réel
+- La persistance des messages dans MongoDB
+- La publication d'événements de notification via Kafka
 
-#### Fonctionnalités
-- Traitement des interactions
-- Stockage des notifications
-- Gestion de l'état de lecture
+### 4. Notification Consumer
+Ce service écoute les événements sur le topic Kafka 'notifications' et crée des notifications dans la base de données. Il traite:
+- Les likes sur les posts
+- Les commentaires sur les posts
+- Les nouveaux messages chat
 
 #### Modèle de Notification
 - Type (LIKE, COMMENT, CHAT_MESSAGE)
@@ -140,15 +164,13 @@ graph TB
 - État de lecture
 - Horodatage
 
-#### Topics Écoutés
-- notifications
+### 5. Stories Consumer
 
-### 4. Stories Consumer
-
-#### Fonctionnalités
-- Gestion du cycle de vie des stories
-- Suppression automatique après 24h
-- Notifications d'expiration
+Ce service gère le cycle de vie des stories éphémères. Il:
+- Écoute les événements sur le topic Kafka 'stories'
+- Traite les événements de création de stories
+- Gère l'expiration des stories (24h après leur création)
+- Publie des notifications pour informer les abonnés des nouvelles stories
 
 #### Modèle de Story
 - Contenu
@@ -156,18 +178,58 @@ graph TB
 - Date de création
 - Date d'expiration
 
-#### Topics Écoutés
-- stories
+## Flux de Données
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as GraphQL Gateway
+    participant S as Services<br/>(Posts + Chat)
+    participant K as Kafka
+    participant M as MongoDB
+
+    %% Interactions Posts/Stories
+    C->>G: Action utilisateur<br/>(post, like, comment, story)
+    G->>S: REST/gRPC
+    S->>M: Sauvegarder
+    S->>K: Événement
+    K-->>M: Notification
+
+    %% Chat temps réel
+    C->>S: Stream chat (gRPC)
+    S->>M: Message
+    S->>K: Événement
+    K-->>M: Notification
+
+    %% Lecture des données
+    C->>G: Query GraphQL
+    G->>S: Requêtes
+    S->>M: Lecture
+    G->>C: Réponse agrégée
+```
+
 
 ## Configuration Technique
 
 ### Variables d'Environnement
-```
+Créez un fichier `.env` à la racine du projet avec les variables suivantes :
+
+```env
+# Base de données
 MONGODB_URI=mongodb://localhost:27017/social-network
-KAFKA_BROKERS=localhost:9092
+
+# Services
 POSTS_SERVICE_PORT=3000
 GRAPHQL_PORT=4000
+CHAT_SERVICE_PORT=50051
+
+# Message Broker
+KAFKA_BROKERS=localhost:9092
+KAFKA_CLIENT_ID=social-network
+
+# Configuration
 STORY_EXPIRATION_HOURS=24
+NODE_ENV=development
 ```
 
 ### Dépendances Principales
@@ -179,42 +241,65 @@ STORY_EXPIRATION_HOURS=24
 ## Guide d'Installation
 
 ### Prérequis
-- Node.js v14+
+- Node.js v16+ 
 - MongoDB 4.4+
 - Apache Kafka 2.8+
-- Zookeeper
+- Zookeeper 3.8+
+- Docker (optionnel)
 
-### Étapes d'Installation
+### Installation et Démarrage
 
-1. **Configuration de l'Environnement**
-   - Cloner le dépôt
-   - Installer les dépendances
-   - Configurer les variables d'environnement
+1. **Configuration Initiale**
+   ```bash
+   # Cloner le projet
+   git clone <repository-url>
+   cd projet-micro
 
-2. **Base de Données**
-   - Démarrer MongoDB
-   - Créer la base de données
-   - Initialiser les collections
+   # Installer les dépendances du projet
+   npm install              # Installe toutes les dépendances listées dans package.json
 
-3. **Message Broker**
-   - Lancer Zookeeper
-   - Démarrer Kafka
-   - Créer les topics requis
+   ```
 
-4. **Services**
+2. **Configuration de l'Infrastructure**
+   
+   b. **Apache Kafka**
+   ```bash
+   # Démarrer Zookeeper (Windows)
+   .\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
+   # Démarrer Kafka (dans un nouveau terminal)
+   .\bin\windows\kafka-server-start.bat .\config\server.properties
+
+   # Créer les topics nécessaires
+   .\bin\windows\kafka-topics.bat --create --topic notifications --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+   .\bin\windows\kafka-topics.bat --create --topic stories --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+   ```
+
+4. **Démarrage des Services**
+   
+   a. **En Mode Développement**
+   ```bash
+   # Démarrer le service de posts (http://localhost:3000)
+   node app.js (dans le répertoire du service Posts)
+  
+   # Démarrer le service GraphQL 
+   node server.js (dans le répertoire du service Graphql)
+   # Interface GraphQL Playground disponible sur http://localhost:4000/graphql
+
+   # Démarrer le service de chat gRPC (localhost:50051)
+   node server.js  (dans le répertoire du service Chat)
+   # Service de chat en temps réel via gRPC
+
+   # Démarrer le consumer de notifications  (dans le répertoire du service kafka-consumers)
+   node notifications.js
+   # Traite les événements de notifications en arrière-plan
+   node stories.js 
+   # Traite les événements de notifications en arrière-plan
+   ```
+
+5. **Services (par ordre)** 
    - Démarrer le service Posts
    - Lancer le service GraphQL
    - Activer les consumers
 
-## Sécurité et Performance
 
-### Sécurité
-- Validation des entrées
-- Gestion des erreurs
-- Logging des événements
-
-### Performance
-- Mise en cache GraphQL
-- Pagination des résultats
-- Indexation MongoDB
-- Gestion asynchrone des événements
