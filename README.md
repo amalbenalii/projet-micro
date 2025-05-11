@@ -253,7 +253,7 @@ NODE_ENV=development
 1. **Configuration Initiale**
    ```bash
    # Cloner le projet
-   git clone <repository-url>
+   git clone <git@github.com:amalbenalii/projet-micro.git>
    cd projet-micro
 
    # Installer les dépendances du projet
