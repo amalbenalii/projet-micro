@@ -56,7 +56,7 @@ graph TB
     %% Core Services
     subgraph "API Layer"
         direction LR
-        Posts["Posts Service<br/>(Express/REST)<br/>:3000"];
+        Posts["Posts Service<br/>(Express/REST)<br/>:3020"];
         GraphQL["GraphQL Gateway<br/>(Apollo Server)<br/>:4000"];
         Chat["Real-time Chat<br/>(gRPC)<br/>:50051"];
     end
@@ -220,7 +220,7 @@ Créez un fichier `.env` à la racine du projet avec les variables suivantes :
 MONGODB_URI=mongodb://localhost:27017/social-network
 
 # Services
-POSTS_SERVICE_PORT=3000
+POSTS_SERVICE_PORT=3020
 GRAPHQL_PORT=4000
 CHAT_SERVICE_PORT=50051
 
@@ -278,7 +278,7 @@ NODE_ENV=development
 
 4. **Démarrage des Services**
 
-   a. Démarrer le service de posts (http://localhost:3000)
+   a. Démarrer le service de posts (http://localhost:3020)
    ```bash
    node app.js (dans le répertoire du service Posts)
    ```
