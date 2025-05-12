@@ -2,7 +2,7 @@ const { ApolloServer, gql } = require('apollo-server');
 const { default: axios } = require('axios');
 require('dotenv').config();
 
-const POSTS_SERVICE_URL = process.env.POSTS_SERVICE_URL || 'http://localhost:3000';
+const POSTS_SERVICE_URL = process.env.POSTS_SERVICE_URL || 'http://localhost:3020';
 
 // GraphQL Schema
 const typeDefs = gql`
