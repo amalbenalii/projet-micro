@@ -25,88 +25,62 @@ const Notification = mongoose.model('Notification', NotificationSchema);
 // Kafka configuration
 const kafka = new Kafka({
     clientId: 'notification-consumer',
-    brokers: ['localhost:9092']
+    brokers: [process.env.KAFKA_BROKERS || 'localhost:9092'],
+    retry: {
+        initialRetryTime: 100,
+        retries: 8
+    }
 });
 
 const consumer = kafka.consumer({ groupId: 'notification-group' });
 
 async function startConsumer() {
     await consumer.connect();
-    await consumer.subscribe({ topics: ['notifications', 'stories'] });
+    await consumer.subscribe({ topic: 'notifications' });
 
     await consumer.run({
         eachMessage: async ({ topic, partition, message }) => {
-            const data = JSON.parse(message.value.toString());
-
-            if (topic === 'notifications') {
-                try {
-                    // Create notification in MongoDB
-                    const notification = new Notification({
-                        type: data.type,
-                        userId: data.userId,
-                        targetUserId: data.targetUserId,
-                        postId: data.postId,
-                        commentText: data.commentText,
-                        messageId: data.messageId
-                    });
-                    await notification.save();
-                    console.log(`New notification created for user ${data.targetUserId}`);
-                } catch (error) {
-                    console.error('Error processing notification:', error);
+            try {
+                const data = JSON.parse(message.value.toString());
+                
+                // Create notification in MongoDB
+                const notification = new Notification({
+                    type: data.type,
+                    userId: data.userId,
+                    targetUserId: data.targetUserId,
+                    postId: data.postId,
+                    commentText: data.commentText,
+                    messageId: data.messageId
+                });
+                
+                await notification.save();
+                // Afficher un message formaté selon le type de notification
+                let notificationMessage = '';
+                switch (data.type) {
+                
+                    case 'LIKE':
+                        notificationMessage = ` Like: User ${data.userId} liked your post`;
+                        break;
+                    case 'COMMENT':
+                        notificationMessage = ` Comment: User ${data.userId} commented: "${data.commentText}"`;
+                        break;
+                    case 'CHAT_MESSAGE':
+                        notificationMessage = ` Message: New message from user ${data.userId}`;
+                        break;
+                    default:
+                        notificationMessage = ` New notification of type ${data.type} from user ${data.userId}`;
                 }
-            } else if (topic === 'stories') {
-                try {
-                    if (data.type === 'STORY_CREATED') {
-                        // Créer une notification pour la nouvelle story
-                        const notification = new Notification({
-                            type: 'STORY_CREATED',
-                            userId: data.userId,
-                            targetUserId: data.userId, // Notification pour le créateur
-                            content: data.content
-                        });
-                        await notification.save();
-                        console.log(`New story notification created for user ${data.userId}`);
-
-                        // Schedule story deletion after 24 hours
-                        setTimeout(async () => {
-                            try {
-                                await Story.deleteOne({ _id: data.storyId });
-                                console.log(`Story ${data.storyId} expired and deleted`);
-
-                                // Créer une notification pour l'expiration
-                                const expirationNotification = new Notification({
-                                    type: 'STORY_EXPIRED',
-                                    userId: data.userId,
-                                    targetUserId: data.userId,
-                                    content: 'Votre story a expiré'
-                                });
-                                await expirationNotification.save();
-                                console.log(`Story expiration notification created for user ${data.userId}`);
-                            } catch (error) {
-                                console.error('Error handling story expiration:', error);
-                            }
-                        }, 24 * 60 * 60 * 1000); // 24 hours
-                    }
-                } catch (error) {
-                    console.error('Error processing story event:', error);
-                }
+                console.log('\n✨ New Notification ✨');
+                console.log(notificationMessage);
+                console.log('Time:', new Date().toLocaleString());
+                
+                console.log('-'.repeat(50));
+            } catch (error) {
+                console.error('Error processing notification:', error);
             }
         }
     });
 }
-
-// Story Schema
-const StorySchema = new mongoose.Schema({
-    userId: { type: String, required: true },
-    content: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now },
-    expiresAt: { 
-        type: Date, 
-        default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
-    }
-});
-
-const Story = mongoose.model('Story', StorySchema);
 
 // Start the consumer
 startConsumer().catch(console.error);
