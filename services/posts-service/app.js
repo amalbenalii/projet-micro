@@ -5,7 +5,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.POSTS_SERVICE_PORT || 3000;
+const PORT = process.env.POSTS_SERVICE_PORT || 3020;
 
 // Middleware
 app.use(express.json());
@@ -55,6 +55,16 @@ const PostSchema = new mongoose.Schema({
 const Post = mongoose.model('Post', PostSchema);
 
 // Routes
+// Get all posts
+app.get('/posts', async (req, res) => {
+    try {
+        const posts = await Post.find().sort({ createdAt: -1 });
+        res.json(posts);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Create a new post
 app.post('/posts', async (req, res) => {
     try {
@@ -62,6 +72,19 @@ app.post('/posts', async (req, res) => {
         const post = new Post({ content, userId });
         await post.save();
         res.status(201).json(post);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get a specific post by ID
+app.get('/posts/:id', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+        res.json(post);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
